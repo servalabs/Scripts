@@ -20,7 +20,6 @@ GETTY_OVERRIDE="/etc/systemd/system/getty@tty1.service.d/override.conf"
 HIDEFB_CONF="/etc/modprobe.d/hidefb.conf"
 SSH_CONFIG="/etc/ssh/sshd_config"
 FAIL2BAN_JAIL="/etc/fail2ban/jail.local"
-ENDLESSH_SERVICE="/etc/systemd/system/endlessh.service"
 INSTALL_MARKER="/var/lib/atomos/install_marker"
 
 # === Logging Functions ===
@@ -80,8 +79,8 @@ update_system() {
     log_info "Updating system packages..."
     apt-get update
     apt-get remove -y intel-microcode
-    apt autoremove -y
-    apt-get install -y jq libpam-modules cockpit samba ssh tree wget syncthing endlessh
+    apt-get autoremove -y
+    apt-get install -y jq libpam-modules cockpit samba ssh tree wget syncthing fail2ban
     apt-get upgrade --with-new-pkgs -y
     log_info "Turning on Tailscale..."
     tailscale up --ssh
@@ -224,36 +223,6 @@ configure_security() {
     # Configure emergency shell
     touch "$EMERGENCY_SERVICE"
     echo -e "[Service]\nExecStart=-/bin/sh -c \"/sbin/sulogin\"" | tee "$EMERGENCY_SERVICE" > /dev/null
-
-    # Install and configure endlessh
-    log_info "Installing and configuring endlessh..."
-    apt-get install -y endlessh
-    cat <<EOF | tee "$ENDLESSH_SERVICE" > /dev/null
-[Unit]
-Description=Endlessh SSH Tarpit
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/endlessh -v -p 22
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    # Restart services
-    log_info "Restarting security services..."
-    systemctl daemon-reload
-    systemctl enable --now endlessh
-
-    # Verify endlessh status
-    if ! systemctl is-active --quiet endlessh; then
-        log_error "Failed to start endlessh"
-        exit 1
-    fi
-    log_info "Endlessh is active"
     
     mark_operation "configure_security"
 }
@@ -325,27 +294,6 @@ configure_ssh() {
     
     # Download and apply new config
     wget -O "$SSH_CONFIG" https://raw.githubusercontent.com/servalabs/scripts/refs/heads/main/general/sshd_config
-    
-    # Configure endlessh
-    log_info "Configuring endlessh..."
-    cat <<EOF | tee "$ENDLESSH_SERVICE" > /dev/null
-[Unit]
-Description=Endlessh SSH Tarpit
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/endlessh -v -p 22
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    # Enable and start endlessh
-    systemctl daemon-reload
-    systemctl enable --now endlessh
 
     # Configure networkadmin user and SSH key
     log_info "Configuring networkadmin user and SSH key..."
