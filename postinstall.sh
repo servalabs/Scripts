@@ -80,11 +80,10 @@ update_system() {
     log_info "Updating system packages..."
     apt-get update
     apt-get remove -y intel-microcode
+    apt autoremove -y
     apt-get install -y jq libpam-modules cockpit samba ssh tree wget syncthing endlessh
     apt-get upgrade --with-new-pkgs -y
-    apt autoremove -y
-    log_info "Installing Tailscale..."
-    curl -fsSL https://tailscale.com/install.sh | sh
+    log_info "Turning on Tailscale..."
     tailscale up --ssh
     
     mark_operation "system_update"
