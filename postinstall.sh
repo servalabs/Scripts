@@ -3,6 +3,9 @@
 # AtomOS Install Script v3.0
 # Combined Main and Backup Server Installation
 
+# run bash <(curl -sL "$(curl -s https://api.github.com/repos/servalabs/scripts/contents/postinstall.sh?ref=main | jq -r '.download_url')")
+
+
 set -euo pipefail
 trap 'echo "Error on line $LINENO"; exit 1' ERR
 

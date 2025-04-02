@@ -29,8 +29,8 @@ Banner none
 DebianBanner no
 
 # Disallow forwarding & other unused subsystems
-AllowTcpForwarding no
-X11Forwarding no
+AllowTcpForwarding yes
+X11Forwarding yes
 Subsystem sftp internal-sftp
 
 # Timeouts
