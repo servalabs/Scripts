@@ -1,4 +1,7 @@
 #!/bin/bash
+
+# bash <(curl -sL https://raw.githubusercontent.com/servalabs/scripts/main/general/samba.sh)
+
 set -euo pipefail
 
 # Ensure the script is run as root.

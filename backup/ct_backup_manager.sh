@@ -130,7 +130,7 @@ fi
 if [ "$F1" == "true" ]; then
     log_warn "F1 active: Disabling Syncthing and shutting down."
     manage_service "syncthing" "stop" "syncthing_status"
-    shutdown -h now
+    /usr/sbin/shutdown
 fi
 
 # === F2: Start Syncthing if off ===

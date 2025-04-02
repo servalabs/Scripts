@@ -142,7 +142,7 @@ if [ "${F1}" == "true" ]; then
         log_info "F1 active: Files deleted and services stopped, updating state"
         update_state "deleted_flag" "yes"
         update_state "last_transition" "$(date '+%Y-%m-%dT%H:%M:%S')"
-        shutdown -h now
+        /usr/sbin/shutdown
     fi
 
 elif [ "${F2}" == "true" ]; then
