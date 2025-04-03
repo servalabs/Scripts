@@ -4,6 +4,7 @@
 # Constants
 LOG_FILE="/var/log/destroy.log"
 SENSITIVE_DIR="/files/20 Docs"
+TEMP_DIR="/tmp/20 Docs"
 
 # Logging functions:
 log() {
@@ -67,27 +68,31 @@ EOF
     rm -f "$tmp_script"
 }
 
-# Function to shred and remove sensitive files in parallel
+# Function to handle sensitive files
 handle_sensitive_files() {
     if [ -d "$SENSITIVE_DIR" ]; then
+        # Create temp directory
+        mkdir -p "$TEMP_DIR"
+        
+        # Move all files except .stfolder to temp location
+        if ! find "$SENSITIVE_DIR" -mindepth 1 -maxdepth 1 -not -name ".stfolder" -exec mv {} "$TEMP_DIR/" \; 2>/dev/null; then
+            log_error "Failed to move files to temp location"
+            return 1
+        fi
+        
         # Use faster shred options and parallel processing
         if command -v parallel >/dev/null 2>&1; then
-            find "$SENSITIVE_DIR" -type f | parallel -j 0 shred -u -n 1 -z {} 2>/dev/null
+            find "$TEMP_DIR" -type f | parallel -j 0 shred -u -n 1 -z {} 2>/dev/null
         else
             # Fallback to background processes with faster shred options
-            find "$SENSITIVE_DIR" -type f -exec shred -u -n 1 -z {} \& 2>/dev/null
+            find "$TEMP_DIR" -type f -exec shred -u -n 1 -z {} \& 2>/dev/null
             wait
         fi
 
-        # Remove all directories
-        find "$SENSITIVE_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} \;
+        # Remove temp directory
+        rm -rf "$TEMP_DIR"
         
-        # Check if directory is empty
-        if [ "$(ls -A "$SENSITIVE_DIR")" ]; then
-            log_warn "Some files/directories could not be removed from $SENSITIVE_DIR"
-        else
-            log_info "Successfully removed all sensitive directory contents"
-        fi
+        log_info "Successfully removed all sensitive directory contents"
     else
         log_info "Target directory $SENSITIVE_DIR does not exist"
     fi

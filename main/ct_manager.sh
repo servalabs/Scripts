@@ -75,19 +75,31 @@ execute_script() {
 
 # Check if sensitive files exist
 sensitive_files_exist() {
-    if [ -d "${SENSITIVE_DIR}" ]; then
-        # Check if directory is empty or not accessible
-        if [ "$(ls -A "${SENSITIVE_DIR}" 2>/dev/null)" ]; then
-            log_info "Sensitive files found in ${SENSITIVE_DIR}"
-            return 0  # Sensitive files exist
-        else
-            # Directory exists but is empty, try to remove it
-            rm -rf "${SENSITIVE_DIR}" 2>/dev/null
-            log_info "Removed empty sensitive directory ${SENSITIVE_DIR}"
-            return 1
-        fi
-    else
+    if [ ! -d "${SENSITIVE_DIR}" ]; then
         log_info "No sensitive directory found at ${SENSITIVE_DIR}"
+        return 1
+    fi
+
+    # Check if we can read the directory
+    if [ ! -r "${SENSITIVE_DIR}" ]; then
+        log_error "Cannot read sensitive directory ${SENSITIVE_DIR}"
+        return 1
+    fi
+
+    # Get list of files excluding .stfolder
+    local files
+    files=$(ls -A "${SENSITIVE_DIR}" 2>/dev/null | grep -v "^.stfolder$")
+    
+    if [ -n "${files}" ]; then
+        log_info "Sensitive files found in ${SENSITIVE_DIR}"
+        return 0  # Sensitive files exist
+    else
+        # Only .stfolder exists or directory is empty
+        if [ -d "${SENSITIVE_DIR}/.stfolder" ]; then
+            log_info "Only .stfolder exists in ${SENSITIVE_DIR}"
+        else
+            log_info "Directory ${SENSITIVE_DIR} is completely empty"
+        fi
         return 1
     fi
 }
