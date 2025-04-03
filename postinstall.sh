@@ -111,6 +111,19 @@ create_directories() {
         fi
     done
     
+    # Create docker group if it doesn't exist
+    if ! getent group docker >/dev/null; then
+        log_info "Creating docker group..."
+        groupadd docker
+    fi
+    
+    # Create admin user if it doesn't exist
+    if ! id admin >/dev/null 2>&1; then
+        log_info "Creating admin user..."
+        useradd -m -s /sbin/nologin admin
+        usermod -aG docker admin
+    fi
+    
     if ! chown -R admin:docker "$FILES_DIR"; then
         log_error "Failed to set ownership on $FILES_DIR"
         return 1
