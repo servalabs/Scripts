@@ -83,12 +83,10 @@ get_samba_username() {
 recreate_sensitive_dir() {
     if [ ! -d "$SENSITIVE_DIR" ]; then
         mkdir -p "$SENSITIVE_DIR"
-        mkdir -p "$SENSITIVE_DIR/.stfolder"
     fi
     # Ensure Samba and Docker can access the directory
     chown -R admin:docker "$SENSITIVE_DIR"
-    chmod 770 "$SENSITIVE_DIR"
-    chmod 755 "$SENSITIVE_DIR/.stfolder"
+    chmod 777 "$SENSITIVE_DIR"
 }
 
 # Main execution
@@ -106,7 +104,7 @@ ALL_SERVICES=(
 enable_and_start_services "${ALL_SERVICES[@]}"
 
 # Fix base permissions for docker and samba access
-chown -R :docker /files && chmod -R 770 /files
+chown -R admin:docker /files && chmod -R 777 /files
 
 # Recreate sensitive directory
 recreate_sensitive_dir

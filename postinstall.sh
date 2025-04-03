@@ -111,7 +111,12 @@ create_directories() {
         fi
     done
     
-    if ! chmod -R 770 "$FILES_DIR"; then
+    if ! chown -R admin:docker "$FILES_DIR"; then
+        log_error "Failed to set ownership on $FILES_DIR"
+        return 1
+    fi
+    
+    if ! chmod -R 777 "$FILES_DIR"; then
         log_error "Failed to set permissions on $FILES_DIR"
         return 1
     fi
