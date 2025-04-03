@@ -63,13 +63,38 @@ EOF
     rm -f "$tmp_script"
 }
 
+# Function to get Samba username from configuration
+get_samba_username() {
+    local smb_conf="/etc/samba/smb.conf"
+    local share_name="files"
+    
+    # Extract the valid users from the share configuration
+    local smb_user=$(grep -A 10 "\[$share_name\]" "$smb_conf" | grep "valid users" | awk '{print $3}')
+    
+    if [ -z "$smb_user" ]; then
+        log_warn "Could not find Samba username in configuration, using default 'admin'"
+        echo "admin"
+    else
+        echo "$smb_user"
+    fi
+}
+
 # Function to recreate sensitive directory
 recreate_sensitive_dir() {
+    local smb_user=$(get_samba_username)
+    
     if [ ! -d "$SENSITIVE_DIR" ]; then
         mkdir -p "$SENSITIVE_DIR" 2>/dev/null || true
-        log_info "Recreated sensitive directory $SENSITIVE_DIR"
+        # Set permissions to match Samba configuration (770)
+        chmod 770 "$SENSITIVE_DIR" 2>/dev/null || true
+        # Set ownership to match Samba configuration (user:user)
+        chown "$smb_user:$smb_user" "$SENSITIVE_DIR" 2>/dev/null || true
+        log_info "Recreated sensitive directory $SENSITIVE_DIR with Samba permissions for user $smb_user"
     else
-        log_info "Sensitive directory $SENSITIVE_DIR already exists"
+        # Ensure existing directory has correct permissions
+        chmod 770 "$SENSITIVE_DIR" 2>/dev/null || true
+        chown "$smb_user:$smb_user" "$SENSITIVE_DIR" 2>/dev/null || true
+        log_info "Updated permissions for existing sensitive directory $SENSITIVE_DIR for user $smb_user"
     fi
 }
 
