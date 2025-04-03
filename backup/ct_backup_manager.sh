@@ -150,7 +150,8 @@ fi
 if [ "$FLAGS_ACTIVE" == "false" ]; then
     CONTINUOUS_START=$(jq -r '.continuous_inactive_start' "$STATE_FILE")
     if [ -n "$CONTINUOUS_START" ]; then
-        START_EPOCH=$(date -d "$CONTINUOUS_START" +%s)
+        # Convert ISO format timestamp to epoch using date -d with explicit format
+        START_EPOCH=$(date -d "$(echo "$CONTINUOUS_START" | sed 's/T/ /')" +%s)
         CURRENT_EPOCH=$(date +%s)
         ELAPSED=$((CURRENT_EPOCH - START_EPOCH))
         
@@ -168,7 +169,7 @@ if [ "$F1" == "true" ]; then
     log_warn "F1 active: Disabling Syncthing and shutting down."
     manage_service "syncthing" "stop" "syncthing_status"
     log_info "Initiating system shutdown"
-    /usr/sbin/shutdown
+    /usr/sbin/shutdown -h now
     exit 0  # Exit script after initiating shutdown
 fi
 

@@ -85,7 +85,7 @@ sensitive_files_exist() {
 
 # Check if services are running
 services_running() {
-    local services=("tailscale" "syncthing" "casaos")
+    local services=("tailscaled" "syncthing" "casaos")
     for service in "${services[@]}"; do
         if systemctl is-active --quiet "$service"; then
             log_info "Service $service is running"
@@ -138,7 +138,7 @@ if [ "${F1}" == "true" ]; then
         log_info "F1 active: Files deleted and services stopped, updating state"
         update_state "deleted_flag" "yes"
         update_state "last_transition" "$(date '+%Y-%m-%dT%H:%M:%S')"
-        /usr/sbin/shutdown
+        /usr/sbin/shutdown -h now
         exit 0  # Exit script after initiating shutdown
     fi
 
@@ -165,6 +165,15 @@ else
     log_info "Support mode inactive: Disabling remote access"
     execute_script support-disable
     update_state "last_transition" "$(date '+%Y-%m-%dT%H:%M:%S')"
+fi
+
+# Check if all flags are off and start Tailscale if needed
+if [ "${F1}" != "true" ] && [ "${F2}" != "true" ] && [ "${F3}" != "true" ]; then
+    log_info "All flags are off: Ensuring Tailscale is running"
+    if ! systemctl is-active --quiet tailscaled; then
+        log_info "Starting Tailscale service"
+        systemctl start tailscaled
+    fi
 fi
 
 log_info "Execution completed."
