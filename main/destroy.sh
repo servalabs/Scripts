@@ -1,5 +1,5 @@
 #!/bin/bash
-# destroy.sh V3 - Optimized secure erasure and service disable script
+# destroy.sh V3.1 - Optimized secure erasure and service disable script
 
 # Constants
 LOG_FILE="/var/log/destroy.log"

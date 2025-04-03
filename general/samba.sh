@@ -1,5 +1,5 @@
 #!/bin/bash
-
+# samba.sh v3.1 - Samba Share Configuration Script
 # bash <(curl -sL https://raw.githubusercontent.com/servalabs/scripts/main/general/samba.sh)
 
 set -euo pipefail

@@ -1,5 +1,5 @@
 #!/bin/bash
-# ct_manager.sh - Consolidated Control Manager with Enhanced Logging
+# ct_manager.sh v3.1 - Consolidated Control Manager with Enhanced Logging
 
 # Constants & Files
 STATE_FILE="/etc/ct/state.json"

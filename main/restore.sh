@@ -1,5 +1,5 @@
 #!/bin/bash
-# restore.sh V3 - Optimized restore environment and re-enable services
+# restore.sh V3.1 - Optimized restore environment and re-enable services
 
 # Constants
 LOG_FILE="/var/log/restore.log"

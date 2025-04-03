@@ -1,5 +1,5 @@
 #!/bin/bash
-# support-disable.sh - Optimized script for disabling remote access services
+# support-disable.sh v3.1 - Optimized script for disabling remote access services
 
 # Constants
 LOG_FILE="/var/log/support-disable.log"

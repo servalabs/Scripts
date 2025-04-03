@@ -1,5 +1,5 @@
 #!/bin/bash
-# support.sh - Optimized script for enabling remote access services
+# support.sh v3.1- Optimized script for enabling remote access services
 
 # Constants
 LOG_FILE="/var/log/support.log"

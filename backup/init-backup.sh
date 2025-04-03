@@ -1,6 +1,6 @@
 #!/bin/bash
 # init-backup.sh - Initialize CT Backup Manager
-# Version: 2.0
+# Version: 3.1
 
 set -euo pipefail
 trap 'echo "Error on line $LINENO"; exit 1' ERR
