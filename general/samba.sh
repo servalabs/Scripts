@@ -17,13 +17,13 @@ share_name="files"
 smbusers_file="/etc/samba/smbusers"
 
 # Prompt for Samba username.
-read -p "Enter the Samba username (e.g., admin): " smb_user
+read -p "Enter the Share username (e.g., admin): " smb_user
 
 # Prompt for Samba password and ensure they match and are not empty.
 while true; do
-  read -s -p "Enter the Samba password: " smb_pass
+  read -s -p "Enter the Share password: " smb_pass
   echo
-  read -s -p "Confirm the Samba password: " smb_pass_confirm
+  read -s -p "Confirm the Share password: " smb_pass_confirm
   echo
   if [ "$smb_pass" != "$smb_pass_confirm" ]; then
     echo "❌ Passwords do not match. Please try again."
@@ -36,7 +36,7 @@ done
 
 # Ensure the Samba configuration file exists.
 if [ ! -f "$samba_conf" ]; then
-  echo "❌ Samba configuration file not found at $samba_conf. Aborting."
+  echo "❌ Share configuration file not found at $samba_conf. Aborting."
   exit 1
 fi
 
@@ -49,7 +49,7 @@ fi
 # Backup the original smb.conf with a timestamp.
 backup_file="${samba_conf}.$(date +%F_%H-%M-%S).bak"
 cp "$samba_conf" "$backup_file"
-echo "📦 Backup of Samba configuration saved to $backup_file"
+echo "📦 Backup of Share configuration saved to $backup_file"
 
 # Remove any existing share block with the same name.
 # This awk command deletes a section that starts with the share name.
@@ -80,7 +80,7 @@ cat >> "$samba_conf" <<EOL
    directory mask = 0755
 EOL
 
-echo "🔧 Added new Samba share [$share_name] to $samba_conf"
+echo "🔧 Added new Share [$share_name] to $samba_conf"
 
 # Create system user if it doesn't exist.
 if ! id -u "$smb_user" >/dev/null 2>&1; then
@@ -102,12 +102,12 @@ tmp_smbusers=$(mktemp)
 grep -v "^$smb_user =" "$smbusers_file" 2>/dev/null > "$tmp_smbusers" || true
 echo "$smb_user = $smb_user" >> "$tmp_smbusers"
 mv "$tmp_smbusers" "$smbusers_file"
-echo "🔄 Updated Samba users mapping in $smbusers_file."
+echo "🔄 Updated Share users mapping in $smbusers_file."
 
 # Add user to Samba.
 if command -v smbpasswd >/dev/null 2>&1; then
   ( echo "$smb_pass"; echo "$smb_pass" ) | smbpasswd -a -s "$smb_user"
-  echo "🔑 Added '$smb_user' to Samba with the provided password."
+  echo "🔑 Added '$smb_user' to Share with the provided password."
 else
   echo "❌ smbpasswd command not found. Please install Samba and try again."
   exit 1
@@ -124,4 +124,4 @@ if systemctl is-active --quiet nmbd; then
   echo "🔄 Restarted nmbd service."
 fi
 
-echo "✅ Samba share [$share_name] created at $samba_dir, accessible to user '$smb_user'."
+echo "✅ Share [$share_name] created at $samba_dir, accessible to user '$smb_user'."

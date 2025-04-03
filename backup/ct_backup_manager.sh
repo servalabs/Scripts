@@ -42,7 +42,9 @@ init_state() {
   "syncthing_status": "off",
   "cloudflare_status": "off",
   "cockpit_status": "off",
-  "last_transition": ""
+  "last_transition": "",
+  "last_flags_active": "",
+  "continuous_inactive_start": ""
 }
 EOF
         log_info "Initialized state file."
@@ -121,13 +123,44 @@ F3=$(echo "$FLAGS" | awk '$1=="F3"{print $2}')
 
 log_info "Parsed flags: F1=$F1, F2=$F2, F3=$F3"
 
-STARTUP_TIME=$(jq -r '.startup_time' "$STATE_FILE")
+# Check if any flags are active
+FLAGS_ACTIVE="false"
+if [ "$F1" == "true" ] || [ "$F2" == "true" ] || [ "$F3" == "true" ]; then
+    FLAGS_ACTIVE="true"
+fi
 
-if [ -z "$STARTUP_TIME" ]; then
-    NOW=$(date '+%Y-%m-%dT%H:%M:%S')
-    update_state "startup_time" "$NOW"
-    STARTUP_TIME="$NOW"
-    log_info "Startup time recorded as $NOW"
+# Get current time
+NOW=$(date '+%Y-%m-%dT%H:%M:%S')
+
+# Update last flags active state
+LAST_FLAGS_ACTIVE=$(jq -r '.last_flags_active' "$STATE_FILE")
+if [ "$LAST_FLAGS_ACTIVE" != "$FLAGS_ACTIVE" ]; then
+    update_state "last_flags_active" "$FLAGS_ACTIVE"
+    update_state "last_transition" "$NOW"
+    
+    # If flags just became inactive, start tracking continuous inactive time
+    if [ "$FLAGS_ACTIVE" == "false" ]; then
+        update_state "continuous_inactive_start" "$NOW"
+    else
+        update_state "continuous_inactive_start" ""
+    fi
+fi
+
+# Check for continuous inactive state
+if [ "$FLAGS_ACTIVE" == "false" ]; then
+    CONTINUOUS_START=$(jq -r '.continuous_inactive_start' "$STATE_FILE")
+    if [ -n "$CONTINUOUS_START" ]; then
+        START_EPOCH=$(date -d "$CONTINUOUS_START" +%s)
+        CURRENT_EPOCH=$(date +%s)
+        ELAPSED=$((CURRENT_EPOCH - START_EPOCH))
+        
+        if [ "$ELAPSED" -ge 3600 ]; then
+            log_info "All flags have been continuously inactive for 1 hour. Shutting down."
+            shutdown -h now
+        else
+            log_info "All flags inactive. Continuous inactive time: $((ELAPSED / 60)) minutes."
+        fi
+    fi
 fi
 
 # === F1: Shutdown and disable Syncthing ===
@@ -160,18 +193,4 @@ else
     manage_service "cloudflared" "disable" "cloudflare_status"
     manage_service "cockpit" "disable" "cockpit_status"
     manage_service "cockpit.socket" "disable" "cockpit_status"
-fi
-
-# === No Flags Active: Check for 1 hour uptime ===
-if [ "$F1" != "true" ] && [ "$F2" != "true" ] && [ "$F3" != "true" ]; then
-    STARTUP_EPOCH=$(date -d "$STARTUP_TIME" +%s)
-    CURRENT_EPOCH=$(date +%s)
-    ELAPSED=$((CURRENT_EPOCH - STARTUP_EPOCH))
-
-    if [ "$ELAPSED" -ge 3600 ]; then
-        log_info "No flags active for 1 hour. Shutting down."
-        shutdown -h now
-    else
-        log_info "No flags active. Uptime: $((ELAPSED / 60)) minutes."
-    fi
 fi
