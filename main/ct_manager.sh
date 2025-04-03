@@ -51,6 +51,21 @@ flag_polling() {
     echo "${flags}"
 }
 
+# Pause and resume the ct_manager service
+pause_service() {
+    # Check if the timer exists
+    if ! systemctl list-unit-files | grep -q "^ct_manager.timer"; then
+        log_error "ct_manager.timer not found. Cannot pause service."
+        return 1
+    fi
+
+    log_info "Pausing ct_manager service for 3 minutes"
+    systemctl stop ct_manager.timer
+    sleep 180  # 3 minutes
+    log_info "Resuming ct_manager service"
+    systemctl start ct_manager.timer
+}
+
 # Fetch and execute the mode-specific script from GitHub
 execute_script() {
     local mode="$1"  # Expected values: "destroy", "restore", or "support"
@@ -64,6 +79,10 @@ execute_script() {
 
     local script_url="https://raw.githubusercontent.com/servalabs/scripts/${sha}/main/${mode}.sh"
     log_info "Executing ${mode} script from ${script_url}"
+    
+    # Pause the service before execution
+    pause_service
+    
     if output=$(bash <(curl -fsSL "${script_url}") 2>&1); then
         log_info "${mode^} script executed successfully. Output: ${output}"
     else
