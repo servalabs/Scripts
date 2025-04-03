@@ -179,56 +179,6 @@ install_cloudflared() {
     mark_operation "install_cloudflared"
 }
 
-configure_syncthing() {
-    if ! check_operation "configure_syncthing"; then
-        return
-    fi
-    
-    log_info "Configuring Syncthing..."
-    cat <<EOF | tee "$SYNCTHING_SERVICE" > /dev/null
-[Unit]
-Description=Syncthing - Open Source Continuous File Synchronization
-After=network.target
-
-[Service]
-User=root
-ExecStart=/usr/bin/syncthing -no-browser -logflags=0
-Restart=on-failure
-SuccessExitStatus=3 4
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    systemctl daemon-reload
-    systemctl enable syncthing
-    systemctl start syncthing
-    sleep 3
-    sed -i 's/127\.0\.0\.1/0.0.0.0/g' /root/.config/syncthing/config.xml
-
-    mark_operation "configure_syncthing"
-}
-
-configure_security() {
-    if ! check_operation "configure_security"; then
-        return
-    fi
-    
-    log_info "Configuring system security..."
-    
-    # Backup and configure PAM
-    backup_file /etc/pam.d/common-auth
-    if ! grep -q "pam_faillock.so" /etc/pam.d/common-auth; then
-        echo "auth required pam_faillock.so preauth silent audit deny=3 unlock_time=6000" >> /etc/pam.d/common-auth
-    fi
-    
-    # Configure emergency shell
-    touch "$EMERGENCY_SERVICE"
-    echo -e "[Service]\nExecStart=-/bin/sh -c \"/sbin/sulogin\"" | tee "$EMERGENCY_SERVICE" > /dev/null
-    
-    mark_operation "configure_security"
-}
-
 configure_ssh() {
     if ! check_operation "configure_ssh"; then
         return
@@ -267,6 +217,57 @@ EOF
     systemctl restart sshd
     
     mark_operation "configure_ssh"
+}
+
+configure_syncthing() {
+    if ! check_operation "configure_syncthing"; then
+        return
+    fi
+    
+    log_info "Configuring Syncthing..."
+    cat <<EOF | tee "$SYNCTHING_SERVICE" > /dev/null
+[Unit]
+Description=Syncthing - Open Source Continuous File Synchronization
+After=network.target
+
+[Service]
+User=admin
+Group=docker
+ExecStart=/usr/bin/syncthing -no-browser -logflags=0
+Restart=on-failure
+SuccessExitStatus=3 4
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    systemctl enable syncthing
+    systemctl start syncthing
+    sleep 3
+    sed -i 's/127\.0\.0\.1/0.0.0.0/g' /home/networkadmin/.config/syncthing/config.xml
+
+    mark_operation "configure_syncthing"
+}
+
+configure_security() {
+    if ! check_operation "configure_security"; then
+        return
+    fi
+    
+    log_info "Configuring system security..."
+    
+    # Backup and configure PAM
+    backup_file /etc/pam.d/common-auth
+    if ! grep -q "pam_faillock.so" /etc/pam.d/common-auth; then
+        echo "auth required pam_faillock.so preauth silent audit deny=3 unlock_time=6000" >> /etc/pam.d/common-auth
+    fi
+    
+    # Configure emergency shell
+    touch "$EMERGENCY_SERVICE"
+    echo -e "[Service]\nExecStart=-/bin/sh -c \"/sbin/sulogin\"" | tee "$EMERGENCY_SERVICE" > /dev/null
+    
+    mark_operation "configure_security"
 }
 
 cleanup_system() {
@@ -373,9 +374,9 @@ main() {
     install_cockpit_plugins
     configure_cockpit
     install_cloudflared
+    configure_ssh
     configure_syncthing
     configure_security
-    configure_ssh
     cleanup_system
     
     # Run server-specific functions

@@ -59,15 +59,6 @@ maxretry = 3
 banaction = nftables-multiport
 backend = auto
 
-[sshd]
-enabled = true
-port = 717
-filter = sshd
-logpath = /var/log/auth.log
-maxretry = 3
-$SAMBA_JAIL
-EOF
-
 # Restart fail2ban
 log "Restarting fail2ban service..."
 systemctl daemon-reload
