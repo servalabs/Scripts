@@ -263,7 +263,7 @@ EOF
     systemctl enable syncthing
     systemctl start syncthing
     sleep 3
-    sed -i 's/127\.0\.0\.1/0.0.0.0/g' /home/networkadmin/.config/syncthing/config.xml
+    sed -i 's/127\.0\.0\.1/0.0.0.0/g' /home/admin/.config/syncthing/config.xml
 
     mark_operation "configure_syncthing"
 }
