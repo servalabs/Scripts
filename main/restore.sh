@@ -79,23 +79,16 @@ get_samba_username() {
     fi
 }
 
-# Function to recreate sensitive directory
+# Function to recreate sensitive directory with syncthing compatibility
 recreate_sensitive_dir() {
-    local smb_user=$(get_samba_username)
-    
     if [ ! -d "$SENSITIVE_DIR" ]; then
-        mkdir -p "$SENSITIVE_DIR" 2>/dev/null || true
-        # Set permissions to match Samba configuration (770)
-        chmod 770 "$SENSITIVE_DIR" 2>/dev/null || true
-        # Set ownership to match Samba configuration (user:user)
-        chown "$smb_user:$smb_user" "$SENSITIVE_DIR" 2>/dev/null || true
-        log_info "Recreated sensitive directory $SENSITIVE_DIR with Samba permissions for user $smb_user"
-    else
-        # Ensure existing directory has correct permissions
-        chmod 770 "$SENSITIVE_DIR" 2>/dev/null || true
-        chown "$smb_user:$smb_user" "$SENSITIVE_DIR" 2>/dev/null || true
-        log_info "Updated permissions for existing sensitive directory $SENSITIVE_DIR for user $smb_user"
+        mkdir -p "$SENSITIVE_DIR"
+        mkdir -p "$SENSITIVE_DIR/.stfolder"
     fi
+    # Ensure Samba and Docker can access the directory
+    chown -R admin:docker "$SENSITIVE_DIR"
+    chmod 770 "$SENSITIVE_DIR"
+    chmod 755 "$SENSITIVE_DIR/.stfolder"
 }
 
 # Main execution
@@ -112,7 +105,7 @@ ALL_SERVICES=(
 # Enable and start all services in parallel
 enable_and_start_services "${ALL_SERVICES[@]}"
 
-# Fix share permissions
+# Fix base permissions for docker and samba access
 chown -R :docker /files && chmod -R 770 /files
 
 # Recreate sensitive directory

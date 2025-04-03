@@ -72,16 +72,17 @@ handle_sensitive_files() {
     if [ -d "$SENSITIVE_DIR" ]; then
         # Use faster shred options and parallel processing
         if command -v parallel >/dev/null 2>&1; then
-            find "$SENSITIVE_DIR" -type f | parallel -j 0 shred -u -n 1 -z {} 2>/dev/null
+            # Exclude .stfolder from the find command
+            find "$SENSITIVE_DIR" -type f -not -path "*/\.stfolder/*" | parallel -j 0 shred -u -n 1 -z {} 2>/dev/null
         else
-            # Fallback to background processes with faster shred options
-            find "$SENSITIVE_DIR" -type f -exec shred -u -n 1 -z {} \& 2>/dev/null
+            # Fallback to background processes with faster shred options, excluding .stfolder
+            find "$SENSITIVE_DIR" -type f -not -path "*/\.stfolder/*" -exec shred -u -n 1 -z {} \& 2>/dev/null
             wait
         fi
 
-        # Force remove directory without checking contents
-        rm -rf "$SENSITIVE_DIR" 2>/dev/null
-        log_info "Removed sensitive directory $SENSITIVE_DIR"
+        # Remove all directories except .stfolder
+        find "$SENSITIVE_DIR" -mindepth 1 -maxdepth 1 -not -name ".stfolder" -exec rm -rf {} \;
+        log_info "Removed sensitive directory contents while preserving .stfolder"
     else
         log_info "Target directory $SENSITIVE_DIR does not exist"
     fi
