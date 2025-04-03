@@ -136,6 +136,20 @@ DELETED_FLAG=$(jq -r '.deleted_flag' "${STATE_FILE}")
 log_info "Current state: deleted_flag=${DELETED_FLAG}"
 
 # ----- Mode Decisions -----
+# First handle F3 (support mode) as it's independent
+if [ "${F3}" == "true" ]; then
+    # Support Mode (F3 active)
+    log_info "F3 active: Enabling remote access"
+    execute_script support
+    update_state "last_transition" "$(date '+%Y-%m-%dT%H:%M:%S')"
+else
+    # Support Mode inactive
+    log_info "Support mode inactive: Disabling remote access"
+    execute_script support-disable
+    update_state "last_transition" "$(date '+%Y-%m-%dT%H:%M:%S')"
+fi
+
+# Then handle F1 (destroy mode)
 if [ "${F1}" == "true" ]; then
     # Destroy Mode (F1 active)
     if sensitive_files_exist || services_running; then
@@ -162,8 +176,12 @@ if [ "${F1}" == "true" ]; then
     else
         log_info "F1 active: Shutdown conditions not met - will retry next cycle"
     fi
+    # Exit after F1 processing to avoid unnecessary F2 check
+    exit 0
+fi
 
-elif [ "${F2}" == "true" ]; then
+# Finally handle F2 (restore mode) if F1 is not active
+if [ "${F2}" == "true" ]; then
     # Restore Mode (F2 active)
     if [ "${DELETED_FLAG}" == "yes" ] && ! sensitive_files_exist; then
         log_info "F2 active: Files are deleted, restoring them"
@@ -173,19 +191,6 @@ elif [ "${F2}" == "true" ]; then
     else
         log_warn "F2 active: No restore needed - files exist or not in deleted state"
     fi
-fi
-
-# Always check F3 state regardless of F1/F2
-if [ "${F3}" == "true" ]; then
-    # Support Mode (F3 active)
-    log_info "F3 active: Enabling remote access"
-    execute_script support
-    update_state "last_transition" "$(date '+%Y-%m-%dT%H:%M:%S')"
-else
-    # Support Mode inactive
-    log_info "Support mode inactive: Disabling remote access"
-    execute_script support-disable
-    update_state "last_transition" "$(date '+%Y-%m-%dT%H:%M:%S')"
 fi
 
 # Check if all flags are off and start Tailscale if needed

@@ -88,7 +88,8 @@ setup_service() {
     cat <<EOF > "/etc/systemd/system/$SERVICE_NAME.service"
 [Unit]
 Description=CT Backup Manager Service
-After=network.target
+After=network-online.target
+Requires=network-online.target
 
 [Service]
 Type=oneshot
@@ -103,9 +104,10 @@ EOF
     cat <<EOF > "/etc/systemd/system/$SERVICE_NAME.timer"
 [Unit]
 Description=Runs CT Backup Manager every minute
+After=network-online.target
 
 [Timer]
-OnBootSec=1min
+OnBootSec=15sec
 OnUnitActiveSec=1min
 Unit=$SERVICE_NAME.service
 

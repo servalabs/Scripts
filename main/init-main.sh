@@ -47,7 +47,8 @@ create_service_file() {
     cat <<EOF | tee "$CT_MANAGER_SERVICE" > /dev/null
 [Unit]
 Description=CT Manager Service
-After=network.target
+After=network-online.target
+Requires=network-online.target
 
 [Service]
 Type=oneshot
@@ -67,9 +68,10 @@ create_timer_file() {
     cat <<EOF | tee "$CT_MANAGER_TIMER" > /dev/null
 [Unit]
 Description=Runs CT Manager every minute
+After=network-online.target
 
 [Timer]
-OnBootSec=1min
+OnBootSec=15sec
 OnUnitActiveSec=1min
 Unit=ct_manager.service
 

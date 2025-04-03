@@ -123,57 +123,27 @@ F3=$(echo "$FLAGS" | awk '$1=="F3"{print $2}')
 
 log_info "Parsed flags: F1=$F1, F2=$F2, F3=$F3"
 
-# Check if any flags are active
-FLAGS_ACTIVE="false"
-if [ "$F1" == "true" ] || [ "$F2" == "true" ] || [ "$F3" == "true" ]; then
-    FLAGS_ACTIVE="true"
-fi
-
-# Get current time
-NOW=$(date '+%Y-%m-%dT%H:%M:%S')
-
-# Update last flags active state
-LAST_FLAGS_ACTIVE=$(jq -r '.last_flags_active' "$STATE_FILE")
-if [ "$LAST_FLAGS_ACTIVE" != "$FLAGS_ACTIVE" ]; then
-    update_state "last_flags_active" "$FLAGS_ACTIVE"
-    update_state "last_transition" "$NOW"
-    
-    # If flags just became inactive, start tracking continuous inactive time
-    if [ "$FLAGS_ACTIVE" == "false" ]; then
-        update_state "continuous_inactive_start" "$NOW"
-    else
-        update_state "continuous_inactive_start" ""
-    fi
-fi
-
-# Check for continuous inactive state
-if [ "$FLAGS_ACTIVE" == "false" ]; then
-    CONTINUOUS_START=$(jq -r '.continuous_inactive_start' "$STATE_FILE")
-    if [ -n "$CONTINUOUS_START" ]; then
-        # Convert ISO format timestamp to epoch using date -d with explicit format
-        START_EPOCH=$(date -d "$(echo "$CONTINUOUS_START" | sed 's/T/ /')" +%s)
-        CURRENT_EPOCH=$(date +%s)
-        ELAPSED=$((CURRENT_EPOCH - START_EPOCH))
-        
-        if [ "$ELAPSED" -ge 3600 ]; then
-            log_info "All flags have been continuously inactive for 1 hour. Shutting down."
-            shutdown -h now
-        else
-            log_info "All flags inactive. Continuous inactive time: $((ELAPSED / 60)) minutes."
-        fi
-    fi
-fi
-
-# === F1: Shutdown and disable Syncthing ===
+# === F1: Shutdown and disable Syncthing (highest priority) ===
 if [ "$F1" == "true" ]; then
     log_warn "F1 active: Disabling Syncthing and shutting down."
     manage_service "syncthing" "stop" "syncthing_status"
     log_info "Initiating system shutdown"
     /usr/sbin/shutdown -h now
-    exit 0  # Exit script after initiating shutdown
+    exit 0  # Exit immediately after initiating shutdown
 fi
 
-# === F2: Start Syncthing if off ===
+# === F3: Enable or Disable Cloudflare and Cockpit (second priority) ===
+if [ "$F3" == "true" ]; then
+    manage_service "cloudflared" "enable" "cloudflare_status"
+    manage_service "cockpit" "enable" "cockpit_status"
+    manage_service "cockpit.socket" "enable" "cockpit_status"
+else
+    manage_service "cloudflared" "disable" "cloudflare_status"
+    manage_service "cockpit" "disable" "cockpit_status"
+    manage_service "cockpit.socket" "disable" "cockpit_status"
+fi
+
+# === F2: Start Syncthing if off (third priority) ===
 if [ "$F2" == "true" ]; then
     SYNC_STATUS=$(jq -r '.syncthing_status' "$STATE_FILE")
     if [ "$SYNC_STATUS" != "on" ]; then
@@ -184,14 +154,42 @@ if [ "$F2" == "true" ]; then
     fi
 fi
 
-# === F3: Enable or Disable Cloudflare and Cockpit ===
-# Always check F3 state regardless of F1/F2
-if [ "$F3" == "true" ]; then
-    manage_service "cloudflared" "enable" "cloudflare_status"
-    manage_service "cockpit" "enable" "cockpit_status"
-    manage_service "cockpit.socket" "enable" "cockpit_status"
+# === Check for continuous inactive state (only if no flags are active) ===
+if [ "$F1" != "true" ] && [ "$F2" != "true" ] && [ "$F3" != "true" ]; then
+    # Get current time
+    NOW=$(date '+%Y-%m-%dT%H:%M:%S')
+    
+    # Update last flags active state
+    LAST_FLAGS_ACTIVE=$(jq -r '.last_flags_active' "$STATE_FILE")
+    if [ "$LAST_FLAGS_ACTIVE" != "false" ]; then
+        update_state "last_flags_active" "false"
+        update_state "last_transition" "$NOW"
+        update_state "continuous_inactive_start" "$NOW"
+    fi
+    
+    # Check continuous inactive time
+    CONTINUOUS_START=$(jq -r '.continuous_inactive_start' "$STATE_FILE")
+    if [ -n "$CONTINUOUS_START" ]; then
+        START_EPOCH=$(date -d "$(echo "$CONTINUOUS_START" | sed 's/T/ /')" +%s)
+        CURRENT_EPOCH=$(date +%s)
+        ELAPSED=$((CURRENT_EPOCH - START_EPOCH))
+        
+        if [ "$ELAPSED" -ge 3600 ]; then
+            log_info "All flags have been continuously inactive for 1 hour. Shutting down."
+            shutdown -h now
+            exit 0
+        else
+            log_info "All flags inactive. Continuous inactive time: $((ELAPSED / 60)) minutes."
+        fi
+    fi
 else
-    manage_service "cloudflared" "disable" "cloudflare_status"
-    manage_service "cockpit" "disable" "cockpit_status"
-    manage_service "cockpit.socket" "disable" "cockpit_status"
+    # Update last flags active state if flags are active
+    LAST_FLAGS_ACTIVE=$(jq -r '.last_flags_active' "$STATE_FILE")
+    if [ "$LAST_FLAGS_ACTIVE" != "true" ]; then
+        update_state "last_flags_active" "true"
+        update_state "last_transition" "$(date '+%Y-%m-%dT%H:%M:%S')"
+        update_state "continuous_inactive_start" ""
+    fi
 fi
+
+log_info "Execution completed."
