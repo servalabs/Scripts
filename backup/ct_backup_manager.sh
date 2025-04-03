@@ -1,6 +1,6 @@
 #!/bin/bash
 # ct_backup_manager.sh - Backup Node Contingency Script
-# Version: 2.0
+# Version: 3.0
 
 set -euo pipefail
 trap 'echo "Error on line $LINENO"; exit 1' ERR

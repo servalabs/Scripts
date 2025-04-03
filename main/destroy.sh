@@ -7,12 +7,7 @@ SENSITIVE_DIR="/files/20 Docs"
 
 # CasaOS services array:
 CASA_SERVICES=(
-  "casaos-app-management.service"
   "casaos-gateway.service"
-  "casaos-local-storage.service"
-  "casaos-message-bus.service"
-  "casaos-user-service.service"
-  "casaos.service"
 )
 
 # Logging functions:
