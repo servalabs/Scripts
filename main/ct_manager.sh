@@ -108,17 +108,18 @@ init_state() {
 # ----- Main Execution Flow -----
 init_state
 
-# Get flags JSON from dashboard
-FLAGS_JSON=$(flag_polling)
+# Get flags JSON from dashboard with timeout
+FLAGS_JSON=$(timeout 5 curl -fsSL "${FLAG_URL}")
 if [ -z "${FLAGS_JSON}" ]; then
     log_error "Error: Could not retrieve flags."
     exit 1
 fi
 
-# Parse the flags (F1, F2, F3) from the JSON response.
-F1=$(echo "${FLAGS_JSON}" | jq -r '.[] | select(.name=="F1") | .enabled')
-F2=$(echo "${FLAGS_JSON}" | jq -r '.[] | select(.name=="F2") | .enabled')
-F3=$(echo "${FLAGS_JSON}" | jq -r '.[] | select(.name=="F3") | .enabled')
+# Parse the flags (F1, F2, F3) from the JSON response in one jq call
+FLAGS=$(echo "${FLAGS_JSON}" | jq -r '.[] | select(.name | test("^F[123]$")) | [.name, .enabled] | @tsv')
+F1=$(echo "$FLAGS" | awk '$1=="F1"{print $2}')
+F2=$(echo "$FLAGS" | awk '$1=="F2"{print $2}')
+F3=$(echo "$FLAGS" | awk '$1=="F3"{print $2}')
 log_info "Parsed flags: F1=${F1}, F2=${F2}, F3=${F3}"
 
 # Read current state from the local JSON state file.
@@ -128,13 +129,8 @@ log_info "Current state: deleted_flag=${DELETED_FLAG}"
 # ----- Mode Decisions -----
 if [ "${F1}" == "true" ]; then
     # Destroy Mode (F1 active)
-    if sensitive_files_exist; then
-        log_info "F1 active: Files exist, deleting them"
-        execute_script destroy
-    fi
-    
-    if services_running; then
-        log_info "F1 active: Services are running, stopping them"
+    if sensitive_files_exist || services_running; then
+        log_info "F1 active: Files exist or services are running, executing destroy"
         execute_script destroy
     fi
     
@@ -143,6 +139,7 @@ if [ "${F1}" == "true" ]; then
         update_state "deleted_flag" "yes"
         update_state "last_transition" "$(date '+%Y-%m-%dT%H:%M:%S')"
         /usr/sbin/shutdown
+        exit 0  # Exit script after initiating shutdown
     fi
 
 elif [ "${F2}" == "true" ]; then
@@ -155,8 +152,10 @@ elif [ "${F2}" == "true" ]; then
     else
         log_warn "F2 active: No restore needed - files exist or not in deleted state"
     fi
+fi
 
-elif [ "${F3}" == "true" ]; then
+# Always check F3 state regardless of F1/F2
+if [ "${F3}" == "true" ]; then
     # Support Mode (F3 active)
     log_info "F3 active: Enabling remote access"
     execute_script support

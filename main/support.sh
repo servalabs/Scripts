@@ -1,5 +1,5 @@
 #!/bin/bash
-# support.sh V4 - Enable remote access by re-enabling and starting Cloudflared, Cockpit, and Cockpit.socket
+# support.sh - Optimized script for enabling remote access services
 
 # Constants
 LOG_FILE="/var/log/support.log"
@@ -19,40 +19,47 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-log_info "Starting support process: Enabling remote access services."
+log_info "Starting optimized support mode enable process."
 
-# Function to enable and start a service
-enable_and_start_service() {
-    local service="$1"
-    if ! systemctl is-enabled --quiet "$service"; then
-        if systemctl enable "$service"; then
-            log_info "Enabled service: $service"
-        else
-            log_warn "Failed to enable service: $service"
-        fi
-    else
-        log_info "Service $service is already enabled"
-    fi
+# Function to enable and start services in parallel
+enable_and_start_services() {
+    local services=("$@")
+    local pids=()
+    
+    # Create a temporary script for parallel execution
+    local tmp_script=$(mktemp)
+    cat > "$tmp_script" << 'EOF'
+#!/bin/bash
+service="$1"
+# Enable and start the service
+systemctl enable "$service" 2>/dev/null || true
+systemctl start "$service" 2>/dev/null || true
+echo "Processed: $service"
+EOF
+    chmod +x "$tmp_script"
 
-    if ! systemctl is-active --quiet "$service"; then
-        if systemctl start "$service"; then
-            log_info "Started service: $service"
-        else
-            log_warn "Failed to start service: $service"
-        fi
-    else
-        log_info "Service $service is already running"
-    fi
+    # Execute services in parallel
+    for service in "${services[@]}"; do
+        "$tmp_script" "$service" &
+        pids+=($!)
+    done
+
+    # Wait for all processes to complete
+    for pid in "${pids[@]}"; do
+        wait "$pid" 2>/dev/null || true
+    done
+
+    rm -f "$tmp_script"
 }
 
-# Main execution
-log_info "Starting support process"
+# Define services to enable
+SUPPORT_SERVICES=(
+    "cloudflared"
+    "cockpit"
+    "cockpit.socket"
+)
 
-# Enable and start Cloudflared
-enable_and_start_service "cloudflared"
+# Enable and start all support services in parallel
+enable_and_start_services "${SUPPORT_SERVICES[@]}"
 
-# Enable and start Cockpit
-enable_and_start_service "cockpit"
-enable_and_start_service "cockpit.socket"
-
-log_info "Support process completed: Remote access enabled."
+log_info "Support mode enable process completed."

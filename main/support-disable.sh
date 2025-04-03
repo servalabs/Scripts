@@ -1,5 +1,5 @@
 #!/bin/bash
-# support-disable.sh V4 - Disable remote access by stopping and disabling Cloudflared, Cockpit, and Cockpit.socket
+# support-disable.sh - Optimized script for disabling remote access services
 
 # Constants
 LOG_FILE="/var/log/support-disable.log"
@@ -19,40 +19,47 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-log_info "Starting support-disable process: Disabling remote access services."
+log_info "Starting optimized support mode disable process."
 
-# Function to stop and disable a service
-stop_and_disable_service() {
-    local service="$1"
-    if systemctl is-active --quiet "$service"; then
-        if systemctl stop "$service"; then
-            log_info "Stopped service: $service"
-        else
-            log_warn "Failed to stop service: $service"
-        fi
-    else
-        log_info "Service $service is already stopped"
-    fi
+# Function to stop and disable services in parallel
+stop_and_disable_services() {
+    local services=("$@")
+    local pids=()
+    
+    # Create a temporary script for parallel execution
+    local tmp_script=$(mktemp)
+    cat > "$tmp_script" << 'EOF'
+#!/bin/bash
+service="$1"
+# Stop and disable the service
+systemctl stop "$service" 2>/dev/null || true
+systemctl disable "$service" 2>/dev/null || true
+echo "Processed: $service"
+EOF
+    chmod +x "$tmp_script"
 
-    if systemctl is-enabled --quiet "$service"; then
-        if systemctl disable "$service"; then
-            log_info "Disabled service: $service"
-        else
-            log_warn "Failed to disable service: $service"
-        fi
-    else
-        log_info "Service $service is already disabled"
-    fi
+    # Execute services in parallel
+    for service in "${services[@]}"; do
+        "$tmp_script" "$service" &
+        pids+=($!)
+    done
+
+    # Wait for all processes to complete
+    for pid in "${pids[@]}"; do
+        wait "$pid" 2>/dev/null || true
+    done
+
+    rm -f "$tmp_script"
 }
 
-# Main execution
-log_info "Starting support-disable process"
+# Define services to disable
+SUPPORT_SERVICES=(
+    "cloudflared"
+    "cockpit"
+    "cockpit.socket"
+)
 
-# Stop and disable Cloudflared
-stop_and_disable_service "cloudflared"
+# Stop and disable all support services in parallel
+stop_and_disable_services "${SUPPORT_SERVICES[@]}"
 
-# Stop and disable Cockpit
-stop_and_disable_service "cockpit"
-stop_and_disable_service "cockpit.socket"
-
-log_info "Support-disable process completed: Remote access disabled."
+log_info "Support mode disable process completed."

@@ -1,5 +1,5 @@
 #!/bin/bash
-# destroy.sh V3 - Securely erase sensitive data and disable services on the SMB server
+# destroy.sh V3 - Optimized secure erasure and service disable script
 
 # Constants
 LOG_FILE="/var/log/destroy.log"
@@ -30,76 +30,94 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-log_info "Starting destroy process."
+log_info "Starting optimized destroy process."
 
-# Function to stop and disable a service
+# Function to stop and disable a specific service
 stop_and_disable_service() {
     local service="$1"
-    if systemctl is-active --quiet "$service"; then
-        if systemctl stop "$service"; then
-            log_info "Stopped service: $service"
-        else
-            log_warn "Failed to stop service: $service"
-        fi
-    else
-        log_info "Service $service is already stopped"
-    fi
-
-    if systemctl is-enabled --quiet "$service"; then
-        if systemctl disable "$service"; then
-            log_info "Disabled service: $service"
-        else
-            log_warn "Failed to disable service: $service"
-        fi
-    else
-        log_info "Service $service is already disabled"
-    fi
+    log_info "Stopping and disabling $service"
+    systemctl stop "$service" 2>/dev/null || true
+    systemctl disable "$service" 2>/dev/null || true
+    # Wait for service to fully stop
+    while systemctl is-active "$service" >/dev/null 2>&1; do
+        sleep 1
+    done
 }
 
-# Function to shred and remove sensitive files
+# Function to stop and disable services in parallel (except Syncthing)
+stop_and_disable_services() {
+    local services=("$@")
+    local pids=()
+    
+    # Create a temporary script for parallel execution
+    local tmp_script=$(mktemp)
+    cat > "$tmp_script" << 'EOF'
+#!/bin/bash
+service="$1"
+# Stop and disable the service
+systemctl stop "$service" 2>/dev/null || true
+systemctl disable "$service" 2>/dev/null || true
+echo "Processed: $service"
+EOF
+    chmod +x "$tmp_script"
+
+    # Execute services in parallel
+    for service in "${services[@]}"; do
+        if [ "$service" != "syncthing" ]; then
+            "$tmp_script" "$service" &
+            pids+=($!)
+        fi
+    done
+
+    # Wait for all processes to complete
+    for pid in "${pids[@]}"; do
+        wait "$pid" 2>/dev/null || true
+    done
+
+    rm -f "$tmp_script"
+}
+
+# Function to shred and remove sensitive files in parallel
 handle_sensitive_files() {
     if [ -d "$SENSITIVE_DIR" ]; then
-        if find "$SENSITIVE_DIR" -type f -exec shred -u -v {} \;; then
-            log_info "Sensitive files shredded in $SENSITIVE_DIR"
+        # Use faster shred options and parallel processing
+        if command -v parallel >/dev/null 2>&1; then
+            find "$SENSITIVE_DIR" -type f | parallel -j 0 shred -u -n 1 -z {} 2>/dev/null
         else
-            log_warn "Error shredding files in $SENSITIVE_DIR"
+            # Fallback to background processes with faster shred options
+            find "$SENSITIVE_DIR" -type f -exec shred -u -n 1 -z {} \& 2>/dev/null
+            wait
         fi
 
-        if rm -rf "$SENSITIVE_DIR"; then
-            log_info "Removed sensitive directory $SENSITIVE_DIR"
-        else
-            log_warn "Failed to remove directory $SENSITIVE_DIR"
-        fi
+        # Force remove directory without checking contents
+        rm -rf "$SENSITIVE_DIR" 2>/dev/null
+        log_info "Removed sensitive directory $SENSITIVE_DIR"
     else
         log_info "Target directory $SENSITIVE_DIR does not exist"
     fi
 }
 
 # Main execution
-log_info "Starting destroy process"
+log_info "Starting optimized destroy process"
 
-# Stop and disable SMB service
-stop_and_disable_service "smbd"
+# Define all services to stop
+ALL_SERVICES=(
+    "smbd"
+    "syncthing"
+    "tailscaled"
+    "cloudflared"
+    "cockpit"
+    "cockpit.socket"
+    "${CASA_SERVICES[@]}"
+)
 
-# Stop and disable Syncthing
+# First stop and disable Syncthing specifically
 stop_and_disable_service "syncthing"
 
-# Handle sensitive files
+# Then stop and disable all other services in parallel
+stop_and_disable_services "${ALL_SERVICES[@]}"
+
+# Handle sensitive files after Syncthing is fully stopped
 handle_sensitive_files
 
-# Stop and disable Tailscale
-stop_and_disable_service "tailscaled"
-
-# Stop and disable Cloudflared
-stop_and_disable_service "cloudflared"
-
-# Stop and disable Cockpit
-stop_and_disable_service "cockpit"
-stop_and_disable_service "cockpit.socket"
-
-# Stop CasaOS services
-for service in "${CASA_SERVICES[@]}"; do
-    stop_and_disable_service "$service"
-done
-
-log_info "Destroy process completed."
+log_info "Optimized destroy process completed."

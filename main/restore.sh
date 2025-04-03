@@ -1,5 +1,5 @@
 #!/bin/bash
-# restore.sh V3 - Restore environment and re-enable services on the SMB server
+# restore.sh V3 - Optimized restore environment and re-enable services
 
 # Constants
 LOG_FILE="/var/log/restore.log"
@@ -30,40 +30,44 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-log_info "Starting restore process."
+log_info "Starting optimized restore process."
 
-# Function to enable and start a service
-enable_and_start_service() {
-    local service="$1"
-    if ! systemctl is-enabled --quiet "$service"; then
-        if systemctl enable "$service"; then
-            log_info "Enabled service: $service"
-        else
-            log_warn "Failed to enable service: $service"
-        fi
-    else
-        log_info "Service $service is already enabled"
-    fi
+# Function to enable and start services in parallel
+enable_and_start_services() {
+    local services=("$@")
+    local pids=()
+    
+    # Create a temporary script for parallel execution
+    local tmp_script=$(mktemp)
+    cat > "$tmp_script" << 'EOF'
+#!/bin/bash
+service="$1"
+# Enable and start the service
+systemctl enable "$service" 2>/dev/null || true
+systemctl start "$service" 2>/dev/null || true
+echo "Processed: $service"
+EOF
+    chmod +x "$tmp_script"
 
-    if ! systemctl is-active --quiet "$service"; then
-        if systemctl start "$service"; then
-            log_info "Started service: $service"
-        else
-            log_warn "Failed to start service: $service"
-        fi
-    else
-        log_info "Service $service is already running"
-    fi
+    # Execute services in parallel
+    for service in "${services[@]}"; do
+        "$tmp_script" "$service" &
+        pids+=($!)
+    done
+
+    # Wait for all processes to complete
+    for pid in "${pids[@]}"; do
+        wait "$pid" 2>/dev/null || true
+    done
+
+    rm -f "$tmp_script"
 }
 
 # Function to recreate sensitive directory
 recreate_sensitive_dir() {
     if [ ! -d "$SENSITIVE_DIR" ]; then
-        if mkdir -p "$SENSITIVE_DIR"; then
-            log_info "Recreated sensitive directory $SENSITIVE_DIR"
-        else
-            log_warn "Failed to recreate directory $SENSITIVE_DIR"
-        fi
+        mkdir -p "$SENSITIVE_DIR" 2>/dev/null || true
+        log_info "Recreated sensitive directory $SENSITIVE_DIR"
     else
         log_info "Sensitive directory $SENSITIVE_DIR already exists"
     fi
@@ -72,31 +76,18 @@ recreate_sensitive_dir() {
 # Main execution
 log_info "Starting restore process"
 
-# Enable and start SMB service
-enable_and_start_service "smbd"
+# Define all services to enable and start
+ALL_SERVICES=(
+    "smbd"
+    "syncthing"
+    "tailscaled"
+    "${CASA_SERVICES[@]}"
+)
+
+# Enable and start all services in parallel
+enable_and_start_services "${ALL_SERVICES[@]}"
 
 # Recreate sensitive directory
 recreate_sensitive_dir
-
-# Enable and start Syncthing
-enable_and_start_service "syncthing"
-
-# Enable and start Tailscale
-enable_and_start_service "tailscaled"
-
-# Enable and start SSH
-enable_and_start_service "sshd"
-
-# Enable and start Cloudflared
-enable_and_start_service "cloudflared"
-
-# Enable and start Cockpit
-enable_and_start_service "cockpit"
-enable_and_start_service "cockpit.socket"
-
-# Start CasaOS services
-for service in "${CASA_SERVICES[@]}"; do
-    enable_and_start_service "$service"
-done
 
 log_info "Restore process completed."

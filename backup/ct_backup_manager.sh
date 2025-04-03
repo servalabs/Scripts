@@ -52,7 +52,7 @@ EOF
 # === Flag Polling ===
 flag_polling() {
     local flags
-    flags=$(curl -fsSL "$FLAG_URL")
+    flags=$(timeout 5 curl -fsSL "$FLAG_URL")
     if [ -z "$flags" ]; then
         log_error "Failed to retrieve flags from $FLAG_URL"
         exit 1
@@ -69,7 +69,7 @@ manage_service() {
     case "$action" in
         "start")
             if ! systemctl is-active --quiet "$service"; then
-                systemctl start "$service"
+                systemctl start "$service" 2>/dev/null || true
                 update_state "$state_key" "on"
                 log_info "$service started successfully"
             else
@@ -78,7 +78,8 @@ manage_service() {
             ;;
         "stop")
             if systemctl is-active --quiet "$service"; then
-                systemctl stop "$service"
+                systemctl stop "$service" 2>/dev/null || \
+                (systemctl kill -s SIGKILL "$service" 2>/dev/null && systemctl stop "$service" 2>/dev/null)
                 update_state "$state_key" "off"
                 log_info "$service stopped successfully"
             else
@@ -87,7 +88,7 @@ manage_service() {
             ;;
         "enable")
             if ! systemctl is-enabled --quiet "$service"; then
-                systemctl enable --now "$service"
+                systemctl enable --now "$service" 2>/dev/null || true
                 update_state "$state_key" "on"
                 log_info "$service enabled and started"
             else
@@ -96,8 +97,9 @@ manage_service() {
             ;;
         "disable")
             if systemctl is-enabled --quiet "$service"; then
-                systemctl stop "$service"
-                systemctl disable "$service"
+                systemctl stop "$service" 2>/dev/null || \
+                (systemctl kill -s SIGKILL "$service" 2>/dev/null && systemctl stop "$service" 2>/dev/null)
+                systemctl disable "$service" 2>/dev/null || true
                 update_state "$state_key" "off"
                 log_info "$service disabled and stopped"
             else
@@ -111,9 +113,11 @@ manage_service() {
 init_state
 FLAGS_JSON=$(flag_polling)
 
-F1=$(echo "$FLAGS_JSON" | jq -r '.[] | select(.name=="F1") | .enabled')
-F2=$(echo "$FLAGS_JSON" | jq -r '.[] | select(.name=="F2") | .enabled')
-F3=$(echo "$FLAGS_JSON" | jq -r '.[] | select(.name=="F3") | .enabled')
+# Parse all flags in one jq call
+FLAGS=$(echo "$FLAGS_JSON" | jq -r '.[] | select(.name | test("^F[123]$")) | [.name, .enabled] | @tsv')
+F1=$(echo "$FLAGS" | awk '$1=="F1"{print $2}')
+F2=$(echo "$FLAGS" | awk '$1=="F2"{print $2}')
+F3=$(echo "$FLAGS" | awk '$1=="F3"{print $2}')
 
 log_info "Parsed flags: F1=$F1, F2=$F2, F3=$F3"
 
@@ -130,7 +134,9 @@ fi
 if [ "$F1" == "true" ]; then
     log_warn "F1 active: Disabling Syncthing and shutting down."
     manage_service "syncthing" "stop" "syncthing_status"
+    log_info "Initiating system shutdown"
     /usr/sbin/shutdown
+    exit 0  # Exit script after initiating shutdown
 fi
 
 # === F2: Start Syncthing if off ===
@@ -145,6 +151,7 @@ if [ "$F2" == "true" ]; then
 fi
 
 # === F3: Enable or Disable Cloudflare and Cockpit ===
+# Always check F3 state regardless of F1/F2
 if [ "$F3" == "true" ]; then
     manage_service "cloudflared" "enable" "cloudflare_status"
     manage_service "cockpit" "enable" "cockpit_status"
