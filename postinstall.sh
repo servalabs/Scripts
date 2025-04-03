@@ -22,7 +22,6 @@ JOURNALD_CONF="/etc/systemd/journald.conf.d/no-console.conf"
 GETTY_OVERRIDE="/etc/systemd/system/getty@tty1.service.d/override.conf"
 HIDEFB_CONF="/etc/modprobe.d/hidefb.conf"
 SSH_CONFIG="/etc/ssh/sshd_config"
-FAIL2BAN_JAIL="/etc/fail2ban/jail.local"
 INSTALL_MARKER="/var/lib/atomos/install_marker"
 
 # === Logging Functions ===
@@ -83,7 +82,7 @@ update_system() {
     apt-get update
     apt-get remove -y intel-microcode
     apt-get autoremove -y
-    apt-get install -y jq libpam-modules cockpit samba ssh tree wget syncthing fail2ban
+    apt-get install -y jq libpam-modules cockpit samba ssh tree wget syncthing
     apt-get upgrade --with-new-pkgs -y
     log_info "Turning on Tailscale..."
     tailscale up --ssh
@@ -228,61 +227,6 @@ configure_security() {
     echo -e "[Service]\nExecStart=-/bin/sh -c \"/sbin/sulogin\"" | tee "$EMERGENCY_SERVICE" > /dev/null
     
     mark_operation "configure_security"
-}
-
-configure_fail2ban() {
-    if ! check_operation "configure_fail2ban"; then
-        return
-    fi
-    
-    log_info "Configuring fail2ban..."
-    
-    # Install fail2ban
-    apt-get install -y fail2ban
-    
-    # Create Samba filter
-    cat <<EOF | tee /etc/fail2ban/filter.d/samba > /dev/null
-[Definition]
-failregex = .*%\(<F-CONTENT>.+</F-CONTENT>\)s
-ignoreregex =
-EOF
-
-    # Configure fail2ban jails
-    cat <<EOF | tee "$FAIL2BAN_JAIL" > /dev/null
-[DEFAULT]
-bantime = 1h
-findtime = 10m
-maxretry = 3
-banaction = nftables-multiport
-backend = auto
-
-[sshd]
-enabled = true
-port = ssh
-filter = sshd
-logpath = /var/log/auth.log
-maxretry = 3
-
-[samba]
-enabled = true
-port = 445,139
-filter = samba
-logpath = /var/log/samba/log.smbd
-maxretry = 3
-EOF
-
-    # Restart fail2ban
-    systemctl daemon-reload
-    systemctl enable --now fail2ban
-
-    # Verify fail2ban status
-    if ! systemctl is-active --quiet fail2ban; then
-        log_error "Failed to start fail2ban"
-        exit 1
-    fi
-    log_info "Fail2ban is active"
-    
-    mark_operation "configure_fail2ban"
 }
 
 configure_ssh() {
@@ -432,7 +376,6 @@ main() {
     configure_syncthing
     configure_security
     configure_ssh
-    configure_fail2ban
     cleanup_system
     
     # Run server-specific functions
