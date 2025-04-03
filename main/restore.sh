@@ -5,16 +5,6 @@
 LOG_FILE="/var/log/restore.log"
 SENSITIVE_DIR="/files/20 Docs"
 
-# CasaOS services array:
-CASA_SERVICES=(
-  "casaos-app-management.service"
-  "casaos-gateway.service"
-  "casaos-local-storage.service"
-  "casaos-message-bus.service"
-  "casaos-user-service.service"
-  "casaos.service"
-)
-
 # Logging functions:
 log() {
     local level="$1"; shift
@@ -30,28 +20,20 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-log_info "Starting optimized restore process."
+log_info "Starting restore process."
 
 # Function to enable and start services in parallel
 enable_and_start_services() {
     local services=("$@")
     local pids=()
     
-    # Create a temporary script for parallel execution
-    local tmp_script=$(mktemp)
-    cat > "$tmp_script" << 'EOF'
-#!/bin/bash
-service="$1"
-# Enable and start the service
-systemctl enable "$service" 2>/dev/null || true
-systemctl start "$service" 2>/dev/null || true
-echo "Processed: $service"
-EOF
-    chmod +x "$tmp_script"
-
-    # Execute services in parallel
+    # Process services in parallel without temporary scripts
     for service in "${services[@]}"; do
-        "$tmp_script" "$service" &
+        (
+            systemctl enable "$service" 2>/dev/null || true
+            systemctl start "$service" 2>/dev/null || true
+            echo "Processed: $service"
+        ) &
         pids+=($!)
     done
 
@@ -59,8 +41,6 @@ EOF
     for pid in "${pids[@]}"; do
         wait "$pid" 2>/dev/null || true
     done
-
-    rm -f "$tmp_script"
 }
 
 # Function to get Samba username from configuration
@@ -97,7 +77,7 @@ ALL_SERVICES=(
     "smbd"
     "syncthing"
     "tailscaled"
-    "${CASA_SERVICES[@]}"
+    "casaos-gateway.service"
 )
 
 # Enable and start all services in parallel

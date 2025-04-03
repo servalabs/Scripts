@@ -88,6 +88,14 @@ if ! id -u "$smb_user" >/dev/null 2>&1; then
   echo "👤 Created system user '$smb_user'."
 fi
 
+# Create docker group if it doesn't exist and add user to it
+if ! getent group docker >/dev/null 2>&1; then
+  groupadd docker
+  echo "👥 Created docker group."
+fi
+usermod -aG docker "$smb_user"
+echo "🐳 Added '$smb_user' to necessary group."
+
 # Set directory ownership and permissions.
 chown -R "$smb_user:$smb_user" "$samba_dir"
 chmod -R 770 "$samba_dir"

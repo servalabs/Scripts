@@ -26,21 +26,13 @@ stop_and_disable_services() {
     local services=("$@")
     local pids=()
     
-    # Create a temporary script for parallel execution
-    local tmp_script=$(mktemp)
-    cat > "$tmp_script" << 'EOF'
-#!/bin/bash
-service="$1"
-# Stop and disable the service
-systemctl stop "$service" 2>/dev/null || true
-systemctl disable "$service" 2>/dev/null || true
-echo "Processed: $service"
-EOF
-    chmod +x "$tmp_script"
-
-    # Execute services in parallel
+    # Process services in parallel without temporary scripts
     for service in "${services[@]}"; do
-        "$tmp_script" "$service" &
+        (
+            systemctl stop "$service" 2>/dev/null || true
+            systemctl disable "$service" 2>/dev/null || true
+            echo "Processed: $service"
+        ) &
         pids+=($!)
     done
 
@@ -48,8 +40,6 @@ EOF
     for pid in "${pids[@]}"; do
         wait "$pid" 2>/dev/null || true
     done
-
-    rm -f "$tmp_script"
 }
 
 # Define services to disable
