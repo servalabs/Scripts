@@ -76,8 +76,8 @@ cat >> "$samba_conf" <<EOL
    guest ok = no
    writable = yes
    valid users = $smb_user
-   create mask = 0755
-   directory mask = 0755
+   create mask = 0770
+   directory mask = 0770
 EOL
 
 echo "🔧 Added new Share [$share_name] to $samba_conf"

@@ -112,6 +112,9 @@ ALL_SERVICES=(
 # Enable and start all services in parallel
 enable_and_start_services "${ALL_SERVICES[@]}"
 
+# Fix share permissions
+chown -R :docker /files && chmod -R 770 /files
+
 # Recreate sensitive directory
 recreate_sensitive_dir
 
