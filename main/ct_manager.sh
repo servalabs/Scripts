@@ -75,21 +75,29 @@ execute_script() {
 
 # Check if sensitive files exist
 sensitive_files_exist() {
-    if [ -d "${SENSITIVE_DIR}" ] && [ "$(ls -A "${SENSITIVE_DIR}")" ]; then
-        log_info "Sensitive files found in ${SENSITIVE_DIR}"
-        return 0  # Sensitive files exist
+    if [ -d "${SENSITIVE_DIR}" ]; then
+        # Check if directory is empty or not accessible
+        if [ "$(ls -A "${SENSITIVE_DIR}" 2>/dev/null)" ]; then
+            log_info "Sensitive files found in ${SENSITIVE_DIR}"
+            return 0  # Sensitive files exist
+        else
+            # Directory exists but is empty, try to remove it
+            rm -rf "${SENSITIVE_DIR}" 2>/dev/null
+            log_info "Removed empty sensitive directory ${SENSITIVE_DIR}"
+            return 1
+        fi
     else
-        log_info "No sensitive files found in ${SENSITIVE_DIR}"
+        log_info "No sensitive directory found at ${SENSITIVE_DIR}"
         return 1
     fi
 }
 
 # Check if services are running
 services_running() {
-    local services=("tailscaled" "syncthing" "casaos")
+    local services=("tailscaled" "syncthing" "smbd" "cloudflared" "cockpit" "cockpit.socket" "casaos-gateway")
     for service in "${services[@]}"; do
         if systemctl is-active --quiet "$service"; then
-            log_info "Service $service is running"
+            log_info "Service $service is still running"
             return 0  # At least one service is running
         fi
     done
@@ -135,12 +143,24 @@ if [ "${F1}" == "true" ]; then
         execute_script destroy
     fi
     
+    # After destroy, check conditions again with detailed logging
+    log_info "Checking post-destroy conditions for shutdown..."
+    if sensitive_files_exist; then
+        log_info "Shutdown blocked: Sensitive files still exist"
+    fi
+    if services_running; then
+        log_info "Shutdown blocked: Services still running"
+    fi
+    
     if ! sensitive_files_exist && ! services_running; then
-        log_info "F1 active: Files deleted and services stopped, updating state"
+        log_info "F1 active: All conditions met for shutdown - files deleted and services stopped"
         update_state "deleted_flag" "yes"
         update_state "last_transition" "$(date '+%Y-%m-%dT%H:%M:%S')"
+        log_info "Initiating shutdown"
         /usr/sbin/shutdown -h now
         exit 0  # Exit script after initiating shutdown
+    else
+        log_info "F1 active: Shutdown conditions not met - will retry next cycle"
     fi
 
 elif [ "${F2}" == "true" ]; then

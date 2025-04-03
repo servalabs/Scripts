@@ -61,7 +61,7 @@ backend = auto
 
 [sshd]
 enabled = true
-port = ssh
+port = 717
 filter = sshd
 logpath = /var/log/auth.log
 maxretry = 3

@@ -5,11 +5,6 @@
 LOG_FILE="/var/log/destroy.log"
 SENSITIVE_DIR="/files/20 Docs"
 
-# CasaOS services array:
-CASA_SERVICES=(
-  "casaos-gateway.service"
-)
-
 # Logging functions:
 log() {
     local level="$1"; shift
@@ -102,7 +97,7 @@ ALL_SERVICES=(
     "cloudflared"
     "cockpit"
     "cockpit.socket"
-    "${CASA_SERVICES[@]}"
+    "casaos-gateway"
 )
 
 # First stop and disable Syncthing specifically
