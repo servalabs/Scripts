@@ -63,28 +63,10 @@ flag_polling() {
 }
 
 # === Service Management ===
-# Pause and resume the backup manager service
-pause_service() {
-    # Check if the timer exists
-    if ! systemctl list-unit-files | grep -q "^ct_backup_manager.timer"; then
-        log_error "ct_backup_manager.timer not found. Cannot pause service."
-        return 1
-    fi
-
-    log_info "Pausing backup manager service for 3 minutes"
-    systemctl stop ct_backup_manager.timer
-    sleep 180  # 3 minutes
-    log_info "Resuming backup manager service"
-    systemctl start ct_backup_manager.timer
-}
-
 manage_service() {
     local service="$1"
     local action="$2"
     local state_key="$3"
-    
-    # Pause the backup manager before managing services
-    pause_service
     
     case "$action" in
         "start")

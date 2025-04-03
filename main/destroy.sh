@@ -99,7 +99,6 @@ log_info "Starting optimized destroy process"
 ALL_SERVICES=(
     "smbd"
     "syncthing"
-    "tailscaled"
     "cloudflared"
     "cockpit"
     "cockpit.socket"
@@ -114,5 +113,9 @@ stop_and_disable_services "${ALL_SERVICES[@]}"
 
 # Handle sensitive files after Syncthing is fully stopped
 handle_sensitive_files
+
+# Finally, stop and disable Tailscale
+log_info "Stopping and disabling Tailscale"
+stop_and_disable_service "tailscaled"
 
 log_info "Optimized destroy process completed."
