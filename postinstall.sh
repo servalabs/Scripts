@@ -129,7 +129,7 @@ create_directories() {
         return 1
     fi
     
-    if ! chmod -R 777 "$FILES_DIR"; then
+    if ! chmod -R 770 "$FILES_DIR"; then
         log_error "Failed to set permissions on $FILES_DIR"
         return 1
     fi

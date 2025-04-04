@@ -66,7 +66,7 @@ recreate_sensitive_dir() {
     fi
     # Ensure Samba and Docker can access the directory
     chown -R admin:docker "$SENSITIVE_DIR"
-    chmod 777 "$SENSITIVE_DIR"
+    chmod 770 "$SENSITIVE_DIR"
 }
 
 # Main execution
@@ -84,7 +84,7 @@ ALL_SERVICES=(
 enable_and_start_services "${ALL_SERVICES[@]}"
 
 # Fix base permissions for docker and samba access
-chown -R admin:docker /files && chmod -R 777 /files
+chown -R admin:docker /files && chmod -R 770 /files
 
 # Recreate sensitive directory
 recreate_sensitive_dir
