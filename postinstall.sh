@@ -264,6 +264,10 @@ EOF
     systemctl start syncthing
     sleep 3
     sed -i 's/127\.0\.0\.1/0.0.0.0/g' /home/admin/.config/syncthing/config.xml
+    
+    # Set default folder path to /files
+    sed -i 's|<folder id="default" path=".*"|& path="/files"|' /home/admin/.config/syncthing/config.xml
+    systemctl restart syncthing
 
     mark_operation "configure_syncthing"
 }
