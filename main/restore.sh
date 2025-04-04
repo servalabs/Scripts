@@ -70,7 +70,7 @@ ensure_permissions() {
     done
     
     # Set ownership and base permissions
-    chown -R admin:"$SHARED_GROUP" "$FILES_DIR"
+    chown -R www-data:"$SHARED_GROUP" "$FILES_DIR"
     find "$FILES_DIR" -type d -exec chmod 775 {} \;
     find "$FILES_DIR" -type f -exec chmod 664 {} \;
     
