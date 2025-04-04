@@ -82,7 +82,7 @@ update_system() {
     apt-get update
     apt-get remove -y intel-microcode
     apt-get autoremove -y
-    apt-get install -y jq libpam-modules cockpit samba ssh tree wget syncthing
+    apt-get install -y jq libpam-modules cockpit ssh tree wget syncthing
     apt-get upgrade --with-new-pkgs -y
     log_info "Turning on Tailscale..."
     tailscale up --ssh
@@ -272,65 +272,6 @@ EOF
     mark_operation "configure_syncthing"
 }
 
-configure_samba() {
-    if ! check_operation "configure_samba"; then
-        return
-    fi
-    
-    log_info "Configuring Samba..."
-    
-    # Backup existing config
-    backup_file /etc/samba/smb.conf
-    
-    # Create new Samba configuration
-    cat <<EOF | tee /etc/samba/smb.conf > /dev/null
-[global]
-   ; Bind Samba exclusively to the Tailscale interface
-   interfaces = tailscale0
-   bind interfaces only = yes
-
-   ; Allow connections only from Tailscale IPs (default range)
-   hosts allow = 100.64.0.0/10
-   hosts deny = 0.0.0.0/0
-
-   ; Basic Samba settings
-   workgroup = WORKGROUP
-   server string = AtomOS Server
-   security = user
-   map to guest = bad user
-   unix charset = UTF-8
-   dos charset = CP932
-   read raw = yes
-   write raw = yes
-   oplocks = yes
-   max xmit = 65535
-   socket options = TCP_NODELAY IPTOS_LOWDELAY
-   dns proxy = no
-   usershare allow guests = no
-   create mask = 0777
-   directory mask = 0777
-   force user = admin
-   force group = docker
-   valid users = admin
-
-[Files]
-   path = /files
-   browseable = yes
-   read only = no
-   guest ok = no
-   create mask = 0777
-   directory mask = 0777
-   force user = admin
-   force group = docker
-EOF
-
-    # Restart Samba service
-    systemctl restart smbd
-    systemctl restart nmbd
-    
-    mark_operation "configure_samba"
-}
-
 configure_security() {
     if ! check_operation "configure_security"; then
         return
@@ -457,7 +398,6 @@ main() {
     install_cloudflared
     configure_ssh
     configure_syncthing
-    configure_samba
     configure_security
     cleanup_system
     

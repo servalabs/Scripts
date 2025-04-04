@@ -93,7 +93,6 @@ log_info "Starting optimized destroy process"
 
 # Define all services to stop
 ALL_SERVICES=(
-    "smbd"
     "cloudflared"
     "cockpit"
     "cockpit.socket"

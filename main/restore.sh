@@ -43,30 +43,14 @@ enable_and_start_services() {
     done
 }
 
-# Function to get Samba username from configuration
-get_samba_username() {
-    local smb_conf="/etc/samba/smb.conf"
-    local share_name="files"
-    
-    # Extract the valid users from the share configuration
-    local smb_user=$(grep -A 10 "\[$share_name\]" "$smb_conf" | grep "valid users" | awk '{print $3}')
-    
-    if [ -z "$smb_user" ]; then
-        log_warn "Could not find Samba username in configuration, using default 'admin'"
-        echo "admin"
-    else
-        echo "$smb_user"
-    fi
-}
-
 # Function to recreate sensitive directory with syncthing compatibility
 recreate_sensitive_dir() {
     if [ ! -d "$SENSITIVE_DIR" ]; then
         mkdir -p "$SENSITIVE_DIR"
     fi
     # Ensure Samba and Docker can access the directory
-    chown -R admin:docker "$SENSITIVE_DIR"
-    chmod 770 "$SENSITIVE_DIR"
+    chown -R www-data:www-data "$SENSITIVE_DIR"
+    chmod 755 "$SENSITIVE_DIR"
 }
 
 # Main execution
@@ -74,7 +58,6 @@ log_info "Starting restore process"
 
 # Define all services to enable and start
 ALL_SERVICES=(
-    "smbd"
     "syncthing"
     "tailscaled"
     "casaos-gateway.service"
@@ -83,8 +66,9 @@ ALL_SERVICES=(
 # Enable and start all services in parallel
 enable_and_start_services "${ALL_SERVICES[@]}"
 
-# Fix base permissions for docker and samba access
-chown -R admin:docker /files && chmod -R 770 /files
+# Fix base permissions for docker access
+chown -R www-data:www-data /files
+chmod -R 755 /files
 
 # Recreate sensitive directory
 recreate_sensitive_dir

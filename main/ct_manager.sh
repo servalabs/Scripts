@@ -106,7 +106,7 @@ sensitive_files_exist() {
 
 # Check if services are running
 services_running() {
-    local services=("tailscaled" "syncthing" "smbd" "cloudflared" "cockpit" "cockpit.socket" "casaos-gateway")
+    local services=("tailscaled" "syncthing" "cloudflared" "cockpit" "cockpit.socket" "casaos-gateway")
     for service in "${services[@]}"; do
         if systemctl is-active --quiet "$service"; then
             log_info "Service $service is still running"
