@@ -246,8 +246,8 @@ Description=Syncthing - Open Source Continuous File Synchronization
 After=network.target
 
 [Service]
-User=admin
-Group=docker
+User=www-data
+Group=fileshare
 ExecStart=/usr/bin/syncthing -no-browser -logflags=0
 Restart=on-failure
 SuccessExitStatus=3 4
