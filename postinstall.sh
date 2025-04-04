@@ -98,9 +98,6 @@ create_directories() {
     log_info "Creating directory structure..."
     local folders=(
         "10 Files" "20 Docs" "30 Gallery" 
-        "40 Entertainment/41 Movies"
-        "40 Entertainment/42 Shows"
-        "40 Entertainment/43 Music"
         "Downloads" ".backups" ".apps" ".assets"
     )
     

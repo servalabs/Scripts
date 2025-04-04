@@ -14,8 +14,6 @@ DIRECTORIES=(
     "10 Files"
     "20 Docs"
     "30 Gallery"
-    "30 Media"
-    "40 Entertainment"
     "Downloads"
 )
 
