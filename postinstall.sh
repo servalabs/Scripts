@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# AtomOS Install Script v3.1
+# AtomOS Install Script v3.3
 # Combined Main and Backup Server Installation
 
 # run bash <(curl -sL "$(curl -s https://api.github.com/repos/servalabs/scripts/contents/postinstall.sh?ref=main | jq -r '.download_url')")
@@ -108,28 +108,43 @@ create_directories() {
         fi
     done
     
-    # Create docker group if it doesn't exist
-    if ! getent group docker >/dev/null; then
-        log_info "Creating docker group..."
-        groupadd docker
+    # Create fileshare group if it doesn't exist
+    if ! getent group fileshare >/dev/null; then
+        log_info "Creating fileshare group..."
+        groupadd fileshare
     fi
     
     # Create admin user if it doesn't exist
     if ! id admin >/dev/null 2>&1; then
         log_info "Creating admin user..."
         useradd -m -s /sbin/nologin admin
-        usermod -aG docker admin
     fi
     
-    if ! chown -R admin:docker "$FILES_DIR"; then
+    # Create syncthing user if it doesn't exist
+    if ! id syncthing >/dev/null 2>&1; then
+        log_info "Creating syncthing user..."
+        useradd -m -s /sbin/nologin syncthing
+    fi
+    
+    # Add users to fileshare group
+    log_info "Adding users to fileshare group..."
+    usermod -aG fileshare www-data
+    usermod -aG fileshare syncthing
+    usermod -aG fileshare admin
+    
+    # Set ownership and permissions
+    if ! chown -R admin:fileshare "$FILES_DIR"; then
         log_error "Failed to set ownership on $FILES_DIR"
         return 1
     fi
     
-    if ! chmod -R 770 "$FILES_DIR"; then
+    if ! chmod -R 2770 "$FILES_DIR"; then
         log_error "Failed to set permissions on $FILES_DIR"
         return 1
     fi
+    
+    # Set ACL to ensure new files inherit group ownership
+    setfacl -R -d -m g::rwx "$FILES_DIR"
     
     log_info "Directory structure created successfully"
     mark_operation "create_directories"
@@ -246,7 +261,7 @@ Description=Syncthing - Open Source Continuous File Synchronization
 After=network.target
 
 [Service]
-User=www-data
+User=syncthing
 Group=fileshare
 ExecStart=/usr/bin/syncthing -no-browser -logflags=0
 Restart=on-failure
@@ -260,10 +275,10 @@ EOF
     systemctl enable syncthing
     systemctl start syncthing
     sleep 3
-    sed -i 's/127\.0\.0\.1/0.0.0.0/g' /home/admin/.config/syncthing/config.xml
+    sed -i 's/127\.0\.0\.1/0.0.0.0/g' /home/syncthing/.config/syncthing/config.xml
     
     # Set default folder path to /files
-    sed -i 's|<folder id="default" path=".*"|& path="/files"|' /home/admin/.config/syncthing/config.xml
+    sed -i 's|<folder id="default" path=".*"|& path="/files"|' /home/syncthing/.config/syncthing/config.xml
     systemctl restart syncthing
 
     mark_operation "configure_syncthing"
