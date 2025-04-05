@@ -82,7 +82,7 @@ update_system() {
     apt-get update
     apt-get remove -y intel-microcode
     apt-get autoremove -y
-    apt-get install -y jq libpam-modules cockpit ssh tree wget syncthing
+    apt-get install -y jq libpam-modules cockpit ssh tree wget syncthing acl
     apt-get upgrade --with-new-pkgs -y
     log_info "Turning on Tailscale..."
     tailscale up --ssh
