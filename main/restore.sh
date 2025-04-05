@@ -61,24 +61,37 @@ ensure_permissions() {
         groupadd "$SHARED_GROUP"
     fi
     
-    # Add necessary users to shared group
-    local users=("admin" "www-data")
-    for user in "${users[@]}"; do
-        if id "$user" >/dev/null 2>&1 && ! groups "$user" | grep -q "$SHARED_GROUP"; then
-            usermod -aG "$SHARED_GROUP" "$user"
-        fi
-    done
-    
-    # Set ownership and base permissions
-    chown -R www-data:"$SHARED_GROUP" "$FILES_DIR"
-    find "$FILES_DIR" -type d -exec chmod 775 {} \;
-    find "$FILES_DIR" -type f -exec chmod 664 {} \;
-    
-    # Ensure Syncthing config has proper permissions
-    if [ -d "/home/admin/.config/syncthing" ]; then
-        chown -R admin:"$SHARED_GROUP" "/home/admin/.config/syncthing"
-        chmod -R 770 "/home/admin/.config/syncthing"
+    # Create admin user if it doesn't exist
+    if ! id admin >/dev/null 2>&1; then
+        log_info "Creating admin user..."
+        useradd -m -s /sbin/nologin admin
     fi
+    
+    # Create syncthing user if it doesn't exist
+    if ! id syncthing >/dev/null 2>&1; then
+        log_info "Creating syncthing user..."
+        useradd -m -s /sbin/nologin syncthing
+    fi
+    
+    # Add users to fileshare group
+    log_info "Adding users to fileshare group..."
+    usermod -aG "$SHARED_GROUP" www-data
+    usermod -aG "$SHARED_GROUP" syncthing
+    usermod -aG "$SHARED_GROUP" admin
+    
+    # Set ownership and permissions
+    if ! chown -R admin:"$SHARED_GROUP" "$FILES_DIR"; then
+        log_error "Failed to set ownership on $FILES_DIR"
+        return 1
+    fi
+    
+    if ! chmod -R 2770 "$FILES_DIR"; then
+        log_error "Failed to set permissions on $FILES_DIR"
+        return 1
+    fi
+    
+    # Set ACL to ensure new files inherit group ownership
+    setfacl -R -d -m g::rwx "$FILES_DIR"
     
     # Remove any immutable flags
     chattr -R -i "$FILES_DIR" 2>/dev/null || true
