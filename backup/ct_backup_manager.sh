@@ -44,10 +44,19 @@ init_state() {
   "cockpit_status": "off",
   "last_transition": "",
   "last_flags_active": "",
-  "continuous_inactive_start": ""
+  "continuous_inactive_start": "",
+  "system_startup_time": ""
 }
 EOF
         log_info "Initialized state file."
+    fi
+    
+    # Set system startup time if not already set
+    local current_startup=$(jq -r '.system_startup_time' "$STATE_FILE")
+    if [ -z "$current_startup" ] || [ "$current_startup" == "null" ]; then
+        local system_startup=$(uptime -s)
+        update_state "system_startup_time" "$system_startup"
+        log_info "System startup time recorded: $system_startup"
     fi
 }
 
@@ -159,27 +168,36 @@ if [ "$F1" != "true" ] && [ "$F2" != "true" ] && [ "$F3" != "true" ]; then
     # Get current time
     NOW=$(date '+%Y-%m-%dT%H:%M:%S')
     
+    # Get system startup time
+    SYSTEM_STARTUP=$(jq -r '.system_startup_time' "$STATE_FILE")
+    SYSTEM_STARTUP_EPOCH=$(date -d "$SYSTEM_STARTUP" +%s)
+    CURRENT_EPOCH=$(date +%s)
+    UPTIME=$((CURRENT_EPOCH - SYSTEM_STARTUP_EPOCH))
+    
     # Update last flags active state
     LAST_FLAGS_ACTIVE=$(jq -r '.last_flags_active' "$STATE_FILE")
     if [ "$LAST_FLAGS_ACTIVE" != "false" ]; then
         update_state "last_flags_active" "false"
         update_state "last_transition" "$NOW"
-        update_state "continuous_inactive_start" "$NOW"
+        # Only set continuous_inactive_start if it's not already set
+        CURRENT_INACTIVE_START=$(jq -r '.continuous_inactive_start' "$STATE_FILE")
+        if [ -z "$CURRENT_INACTIVE_START" ] || [ "$CURRENT_INACTIVE_START" == "null" ]; then
+            update_state "continuous_inactive_start" "$NOW"
+        fi
     fi
     
     # Check continuous inactive time
     CONTINUOUS_START=$(jq -r '.continuous_inactive_start' "$STATE_FILE")
-    if [ -n "$CONTINUOUS_START" ]; then
+    if [ -n "$CONTINUOUS_START" ] && [ "$CONTINUOUS_START" != "null" ]; then
         START_EPOCH=$(date -d "$(echo "$CONTINUOUS_START" | sed 's/T/ /')" +%s)
-        CURRENT_EPOCH=$(date +%s)
         ELAPSED=$((CURRENT_EPOCH - START_EPOCH))
         
         if [ "$ELAPSED" -ge 3600 ]; then
-            log_info "All flags have been continuously inactive for 1 hour. Shutting down."
+            log_info "All flags have been continuously inactive for 1 hour. System uptime: $((UPTIME / 60)) minutes. Shutting down."
             shutdown -h now
             exit 0
         else
-            log_info "All flags inactive. Continuous inactive time: $((ELAPSED / 60)) minutes."
+            log_info "All flags inactive. Continuous inactive time: $((ELAPSED / 60)) minutes. System uptime: $((UPTIME / 60)) minutes."
         fi
     fi
 else
@@ -188,6 +206,7 @@ else
     if [ "$LAST_FLAGS_ACTIVE" != "true" ]; then
         update_state "last_flags_active" "true"
         update_state "last_transition" "$(date '+%Y-%m-%dT%H:%M:%S')"
+        # Clear continuous_inactive_start when flags become active
         update_state "continuous_inactive_start" ""
     fi
 fi
