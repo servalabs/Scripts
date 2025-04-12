@@ -108,7 +108,7 @@ After=network-online.target
 
 [Timer]
 OnBootSec=15sec
-OnUnitActiveSec=1min
+OnUnitActiveSec=30sec
 Unit=$SERVICE_NAME.service
 
 [Install]

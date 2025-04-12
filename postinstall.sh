@@ -156,10 +156,7 @@ module_system_update() {
         ssh \
         tree \
         wget \
-        curl \
-        syncthing \
-        acl \
-        fail2ban
+        curl
     
     # Upgrade installed packages
     log_info "Upgrading installed packages..."

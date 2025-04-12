@@ -72,7 +72,7 @@ After=network-online.target
 
 [Timer]
 OnBootSec=15sec
-OnUnitActiveSec=1min
+OnUnitActiveSec=30sec
 Unit=ct_manager.service
 
 [Install]
