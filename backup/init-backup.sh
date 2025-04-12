@@ -103,7 +103,7 @@ EOF
     # Create timer file
     cat <<EOF > "/etc/systemd/system/$SERVICE_NAME.timer"
 [Unit]
-Description=Runs CT Backup Manager every minute
+Description=Runs CT Backup Manager every 30 Seconds
 After=network-online.target
 
 [Timer]

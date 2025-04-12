@@ -67,7 +67,7 @@ create_timer_file() {
     log_info "Creating systemd timer file ${CT_MANAGER_TIMER}..."
     cat <<EOF | tee "$CT_MANAGER_TIMER" > /dev/null
 [Unit]
-Description=Runs CT Manager every minute
+Description=Runs CT Manager every 30 Seconds
 After=network-online.target
 
 [Timer]
